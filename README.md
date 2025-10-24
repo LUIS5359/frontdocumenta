@@ -115,3 +115,52 @@ _Añade nuevos módulos dentro de `src/app/` siguiendo una organización por dom
 - [Documentación de RxJS](https://rxjs.dev/)
 
 > Mantén este documento actualizado conforme evolucionen las funcionalidades, dependencias y procesos del proyecto.
+
+## 15. Servicios, funciones y comunicaciones implementadas
+
+La aplicación ya incorpora una capa de servicios y utilidades que abstraen todas las llamadas HTTP disponibles. A continuación se resume cada servicio, los métodos expuestos y el endpoint de backend que consumen (`environment.apiUrl` apunta actualmente a `https://wispy-clarette-mancossistemas-76b53d39.koyeb.app/api`).
+
+### 15.1 Autenticación y seguridad (`src/app/core/` y `src/app/auth/`)
+
+| Artefacto | Métodos / Funciones | Descripción |
+| --- | --- | --- |
+| `AuthService` | `login(credentials)` | Inicia sesión contra `POST /auth/login`, guarda token, usuario y rol en `localStorage` y normaliza el rol. |
+|  | `register(payload)` | Registra usuarios vía `POST /auth/register`. |
+|  | `logout()` | Limpia credenciales locales y redirige a `/login`. |
+|  | `getToken()`, `getRole()`, `getUsername()` | Lectura directa de claves en `localStorage`. |
+|  | `hasRole(role)`, `hasAnyRole(roles)` | Utilidades de autorización basadas en señales de rol. |
+|  | `isTokenValid()` | Valida expiración JWT decodificando su `payload`. |
+|  | _Interno:_ `checkStoredAuth()` y `decodeToken()` | Restauran sesiones persistidas y decodifican JWT respectivamente. |
+| `authGuard` | Función `CanActivateFn` | Bloquea rutas sin token o sin roles permitidos; redirige a `/login` o `/dashboard`. |
+| `authInterceptor` | Función `HttpInterceptorFn` | Inserta el encabezado `Authorization: Bearer <token>` en cada request si existe sesión. |
+| `Login` component | `OnSubmit()` | Orquesta autenticación desde formulario reactivo y navega al dashboard. |
+| `Register` component | `submit()` | Invoca `AuthService.register` y redirige a la vista de login tras crear un usuario. |
+
+### 15.2 Servicios de catálogos contables
+
+| Servicio | Métodos | Endpoint base |
+| --- | --- | --- |
+| `BancoService` | `getAll()`, `getById(id)`, `create(banco)`, `update(id, banco)`, `delete(id)` | `/bancos` |
+| `CuentaService` | `getAll()`, `getById(id)`, `create(cuenta)`, `update(id, cuenta)`, `delete(id)` | `/cuentas` (requiere encabezados con token) |
+| `InventarioService` | `getAll(filters)`, `getById(id)`, `create(producto)`, `update(id, producto)`, `delete(id)`, `ajustarStock(id, cantidad, operacion)`, `actualizarPrecio(id, precio)` | `/inventario` (incluye operaciones `PATCH` para stock y precio) |
+| `ClienteService` | `getAll(filters)`, `getById(id)`, `create(cliente)`, `update(id, cliente)`, `delete(id)` | `/clientes` |
+| `ProveedorService` | `getAll(filters)`, `getById(id)`, `create(proveedor)`, `update(id, proveedor)`, `delete(id)`, `cargarSaldo(id, monto)`, `abonarSaldo(id, monto)`, `actualizarSaldo(id, valor)` | `/proveedores` |
+
+### 15.3 Servicios de operaciones contables
+
+| Servicio | Métodos | Endpoint base |
+| --- | --- | --- |
+| `DiarioService` | `getAll()`, `getById(id)`, `create(transaccion)`, `update(id, transaccion)`, `delete(id)` | `/libro-diario` |
+| `LibroMayorService` | `getAll()`, `getByCuenta(cuentaId)`, `getSaldoByCuenta(cuentaId)` | `/libro-mayor` |
+| `BalanceSaldoService` | `getAllBalances()`, `generarBalance(fecha)`, `getBalancePorCuenta(cuentaId)` | `/balance-saldos` |
+| `EstadoResultadoService` | `getAll()`, `getById(id)`, `create(payload)`, `update(id, payload)`, `delete(id)`, `generar(inicio, fin)` | `/estado-resultados` |
+| `BancoCajaService` | `getAll(filters)`, `getById(id)`, `create(transaccion)`, `update(id, transaccion)`, `delete(id)`, `getTotal(filters)`, `getTotalPorTipo(filters)` | `/bancos-caja` |
+
+### 15.4 Dashboard y utilidades
+
+| Servicio / utilitario | Métodos | Detalle |
+| --- | --- | --- |
+| `DashboardService` | `getMetrics()` | Consume `GET /dashboard/metrics`, infiere el rol desde `localStorage` y transforma la respuesta del backend en KPIs, cards y alertas para la vista. |
+| `environment` | Constante `apiUrl` | Centraliza la URL del backend; modificar aquí al desplegar en otro entorno. |
+
+> Cada servicio usa `HttpClient` con tipado fuerte y, cuando corresponde, añade encabezados `Authorization` usando el token que el `AuthService` persiste en `localStorage`. Al incorporar nuevos módulos reutiliza esta convención para mantener consistencia en la comunicación con el backend.
